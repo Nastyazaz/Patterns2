@@ -5,14 +5,15 @@ import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
+import lombok.Value;
 
 import java.util.Locale;
 
 import static io.restassured.RestAssured.given;
 
 public class DataGenerator {
-
-    private static RequestSpecification requestSpec = new RequestSpecBuilder()
+    private static final Faker faker = new Faker(new Locale("en"));
+    private static final RequestSpecification requestSpec = new RequestSpecBuilder()
             .setBaseUri("http://localhost")
             .setPort(9999)
             .setAccept(ContentType.JSON)
@@ -20,56 +21,51 @@ public class DataGenerator {
             .log(LogDetail.ALL)
             .build();
 
-    public static void setUpAll(Registrationinfo info) {
-        // сам запрос
-        given() // "дано"
-                .spec(requestSpec) // указываем, какую спецификацию используем
-                .body(new Registrationinfo(info.getLogin(), info.getPassword(), info.getStatus())) // передаём в теле объект, который будет преобразован в JSON
-                .when() // "когда"
-                .post("/api/system/users") // на какой путь относительно BaseUri отправляем запрос
-                .then() // "тогда ожидаем"
-                .statusCode(200); // код 200 OK
+
+    private DataGenerator() {
     }
 
-    public static Registrationinfo generateUser(String locale) {
-        Faker faker = new Faker(new Locale(locale));
-        String login = faker.name().username();
-        String password = faker.internet().password();
-        setUpAll(new Registrationinfo(login, password, "active"));
-        return new Registrationinfo(login, password, "active");
+    private static void sendRequest(RegistrationDto user) {
+        given()
+                .spec(requestSpec)
+                .body(user)
+                .when()
+                .post("/api/system/users")
+                .then().log().all()
+                .statusCode(200);
     }
 
-    public static Registrationinfo generateUserNoAuth(String locale) {
-        Faker faker = new Faker(new Locale(locale));
-        String login = faker.name().username();
-        String password = faker.internet().password();
-        return new Registrationinfo(login, password, "active");
+    public static String getRandomLogin() {
+        return faker.name().username();
+
     }
 
-    public static Registrationinfo generateBlockedUser(String locale) {
-        Faker faker = new Faker(new Locale(locale));
-        String login = faker.name().username();
-        String password = faker.internet().password();
-        setUpAll(new Registrationinfo(login, password, "blocked"));
-        return new Registrationinfo(login, password, "blocked");
+    public static String getRandomPassword() {
+        return faker.internet().password();
+
     }
 
-    public static Registrationinfo generateInvalidLoginUser(String locale) {
-        Faker faker = new Faker(new Locale(locale));
-        String login = faker.name().username();
-        String password = faker.internet().password();
-        setUpAll(new Registrationinfo(login, password, "active"));
-        return new Registrationinfo(faker.name().username(), password, "active");
+    public static class Registration {
+        private Registration() {
+        }
+
+        public static RegistrationDto getUser(String status) {
+            return new RegistrationDto(getRandomLogin(), getRandomPassword(), status);
+        }
+
+        public static RegistrationDto getRegisteredUser(String status) {
+            var user = getUser(status);
+            sendRequest(user);
+            return user;
+        }
     }
 
-    public static Registrationinfo generateInvalidPasswordUser(String locale) {
-        Faker faker = new Faker(new Locale(locale));
-        String login = faker.name().username();
-        String password = faker.internet().password();
-        setUpAll(new Registrationinfo(login, password, "active"));
-        return new Registrationinfo(login, faker.internet().password(), "active");
+    @Value
+    public static class RegistrationDto {
+        String login;
+        String password;
+        String status;
     }
-
 }
 
 
